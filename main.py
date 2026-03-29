@@ -68,14 +68,15 @@ def run():
                     odd
                 )
 
-                # Filtro
+                # FILTRO PROFISSIONAL
                 if not apply_filters(g, ml_prob, odd):
                     continue
 
-                # Value bet
+                # VALUE BET
                 val = value(ml_prob, odd)
 
-                if val > VALUE_THRESHOLD:
+                # 🔥 EXTRA APLICADO AQUI
+                if val > VALUE_THRESHOLD and ml_prob > 0.52:
                     all_bets.append({
                         "jogo": g["match"],
                         "liga": g["league"],

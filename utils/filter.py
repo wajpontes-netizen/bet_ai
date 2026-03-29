@@ -1,11 +1,9 @@
 def apply_filters(game, prob, odd):
 
-    # Probabilidade mínima
-    if prob < 0.55:
+    if prob < 0.52:
         return False
 
-    # Odds dentro do intervalo ideal
-    if odd < 1.70 or odd > 2.50:
+    if odd < 1.50 or odd > 3.00:
         return False
 
     return True
