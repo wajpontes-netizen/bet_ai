@@ -2,14 +2,16 @@ import numpy as np
 from scipy.stats import poisson
 import os
 import time
+import pandas as pd
 
-from config import BANKROLL, VALUE_THRESHOLD
+from config import VALUE_THRESHOLD
 from services.api import get_games
 from utils.filter import apply_filters
 from ml_model import predict_bet
 from services.telegram import send
 
 MAX_GOALS = 6
+PENDING_PATH = "data/pending_bets.csv"
 
 # -----------------------------
 # MODELOS
@@ -48,7 +50,6 @@ def run():
 
             over = over25(matrix)
 
-            # 🎯 linha dinâmica de cantos
             linha_cantos = max(7.5, round(g["corners_mean"]) - 0.5)
             corners = corners_over(g["corners_mean"], linha_cantos)
 
@@ -59,41 +60,45 @@ def run():
 
             for name, (prob_modelo, odd) in bets.items():
 
-                print(f"\n➡️ Testando mercado: {name}")
-
                 if odd == 0:
-                    print("❌ Odd zerada")
                     continue
 
-                # IA real (sem boost fake)
                 try:
                     ml_prob_raw = predict_bet(
-                        g["home_xg"] + g["away_xg"],
+                        g["home_xg"],
+                        g["away_xg"],
+                        g["corners_mean"],
                         odd
                     )
-                except Exception as e:
-                    print(f"Erro na IA: {e}")
+                except:
                     ml_prob_raw = 0.5
 
-                # 🔥 combinação real
                 ml_prob = (prob_modelo * 0.8) + (ml_prob_raw * 0.2)
 
                 val = value(ml_prob, odd)
 
-                print(f"📊 Prob Final: {round(ml_prob,2)} | Odd: {odd} | Value: {round(val,3)}")
+                print(f"📊 Prob: {round(ml_prob,2)} | Odd: {odd} | Value: {round(val,3)}")
 
-                # FILTRO
-                try:
-                    if not apply_filters(g, ml_prob, odd):
-                        print("⛔ Reprovado no filtro")
-                        continue
-                except Exception as e:
-                    print(f"Erro no filtro: {e}")
-                    continue
+                if val > 0.005 and ml_prob > 0.50:
 
-                # DECISÃO MAIS PROFISSIONAL
-                if val > 0.02 and ml_prob > 0.52:
                     print("✅ Aposta aprovada")
+
+                    # salva aposta
+                    new_row = pd.DataFrame([{
+                        "match": g["match"],
+                        "league": g["league"],
+                        "home_xg": g["home_xg"],
+                        "away_xg": g["away_xg"],
+                        "corners_mean": g["corners_mean"],
+                        "odd": odd,
+                        "date": g.get("date", ""),
+                        "market": name
+                    }])
+
+                    if os.path.exists(PENDING_PATH):
+                        new_row.to_csv(PENDING_PATH, mode='a', header=False, index=False)
+                    else:
+                        new_row.to_csv(PENDING_PATH, index=False)
 
                     all_bets.append({
                         "jogo": g["match"],
@@ -104,60 +109,40 @@ def run():
                         "value": val,
                         "data": g.get("date", "N/A")
                     })
-                else:
-                    print("❌ Sem valor suficiente")
 
         except Exception as e:
-            print(f"Erro geral: {e}")
+            print(f"Erro: {e}")
             continue
 
-    # -----------------------------
-    # RESULTADOS
-    # -----------------------------
     if not all_bets:
         print("\n⚠️ Nenhuma aposta encontrada")
     else:
-        all_bets = sorted(all_bets, key=lambda x: x["value"], reverse=True)
-
-        # 🔥 só TOP 5 (qualidade)
-        all_bets = all_bets[:5]
-
-        print("\n🔥 TOP APOSTAS:\n")
+        all_bets = sorted(all_bets, key=lambda x: x["value"], reverse=True)[:5]
 
         for bet in all_bets:
-
             msg = f"""
 🔥 VALUE BET
 
 🏆 {bet['jogo']}
-🕒 Horário: {bet['data']}
-🏆 Liga: {bet['liga']}
-📊 Mercado: {bet['mercado']}
+🕒 {bet['data']}
+📊 {bet['mercado']}
 📈 Prob: {round(bet['prob'],2)}
 💰 Odd: {bet['odd']}
 💎 Value: {round(bet['value'],2)}
 """
-
             print(msg)
-
             try:
                 send(msg)
             except:
                 pass
 
-    # -----------------------------
-    # AUTO UPDATE
-    # -----------------------------
     print("\n🔄 Atualizando base...")
     os.system("python auto_update.py")
 
 
-# -----------------------------
-# LOOP 24H
-# -----------------------------
+# LOOP
 if __name__ == "__main__":
     while True:
-        print("\n🚀 Iniciando análise...")
+        print("\n🚀 Rodando...")
         run()
-        print("\n⏳ Aguardando 1 hora...")
         time.sleep(3600)
