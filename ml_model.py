@@ -1,32 +1,27 @@
 import numpy as np
-from xgboost import XGBClassifier
+import joblib
+import os
 
-# modelo simples (depois vamos treinar melhor)
-model = XGBClassifier()
+MODEL_PATH = "model.pkl"
 
 def predict_bet(home_xg, away_xg, corners, odd, extra):
 
+    if not os.path.exists(MODEL_PATH):
+        return 0.5
+
     try:
+        model = joblib.load(MODEL_PATH)
+
         features = np.array([[
             home_xg,
             away_xg,
             corners,
-
-            extra["home_goals_avg"],
-            extra["away_goals_avg"],
-            extra["home_conceded_avg"],
-            extra["away_conceded_avg"],
-            extra["home_form"],
-            extra["away_form"],
-            extra["shots_home"],
-            extra["shots_away"],
-
             odd
         ]])
 
         prob = model.predict_proba(features)[0][1]
 
-    except:
-        prob = 0.5
+        return prob
 
-    return prob
+    except:
+        return 0.5

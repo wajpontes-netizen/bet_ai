@@ -1,86 +1,69 @@
 import pandas as pd
 import os
-import random
+from xgboost import XGBClassifier
+import joblib
 
 PENDING_PATH = "data/pending_bets.csv"
-HIST_PATH = "data/historico.csv"
+DATASET_PATH = "data/dataset.csv"
+MODEL_PATH = "model.pkl"
 
-# -----------------------------
-# RESULTADO (TEMPORÁRIO)
-# -----------------------------
-def get_result():
-    # ⚠️ depois vamos trocar por API real
-    return random.choice([0, 1])
-
-# -----------------------------
-# ATUALIZAR DATASET
-# -----------------------------
 def update_dataset():
 
-    # arquivo não existe
     if not os.path.exists(PENDING_PATH):
-        print("📭 Sem apostas pendentes")
+        print("⚠️ Sem dados novos")
         return
 
-    # tenta ler
     try:
         df = pd.read_csv(PENDING_PATH)
-    except Exception as e:
-        print(f"⚠️ Erro ao ler arquivo: {e}")
-        return
-
-    # arquivo vazio
-    if df.empty:
-        print("⚠️ Nenhuma aposta para atualizar")
-        return
-
-    print(f"📊 Atualizando {len(df)} apostas...")
-
-    results = []
-
-    for _, row in df.iterrows():
-        try:
-            result = get_result()
-
-            results.append({
-                "home_xg": row.get("home_xg", 0),
-                "away_xg": row.get("away_xg", 0),
-                "corners_mean": row.get("corners_mean", 0),
-                "odd": row.get("odd", 0),
-                "resultado": result
-            })
-
-        except Exception as e:
-            print(f"Erro ao processar linha: {e}")
-            continue
-
-    # nada processado
-    if not results:
-        print("⚠️ Nenhum resultado gerado")
-        return
-
-    new_data = pd.DataFrame(results)
-
-    # salva histórico
-    try:
-        if os.path.exists(HIST_PATH):
-            new_data.to_csv(HIST_PATH, mode='a', header=False, index=False)
-        else:
-            new_data.to_csv(HIST_PATH, index=False)
-    except Exception as e:
-        print(f"Erro ao salvar histórico: {e}")
-        return
-
-    # remove pendentes
-    try:
-        os.remove(PENDING_PATH)
     except:
-        pass
+        print("⚠️ Arquivo vazio")
+        return
 
-    print("✅ Histórico atualizado com sucesso!")
+    if df.empty:
+        print("⚠️ Sem linhas")
+        return
 
-# -----------------------------
+    # SIMULA RESULTADO (depois ligamos API real)
+    df["result"] = df["home_xg"] + df["away_xg"] > 2.5
+
+    if os.path.exists(DATASET_PATH):
+        old = pd.read_csv(DATASET_PATH)
+        df = pd.concat([old, df])
+
+    df.to_csv(DATASET_PATH, index=False)
+
+    os.remove(PENDING_PATH)
+
+    print("✅ Dataset atualizado")
+
+def train_model():
+
+    if not os.path.exists(DATASET_PATH):
+        print("⚠️ Sem dataset")
+        return
+
+    df = pd.read_csv(DATASET_PATH)
+
+    if len(df) < 50:
+        print("⚠️ Poucos dados para treinar IA")
+        return
+
+    X = df[[
+        "home_xg",
+        "away_xg",
+        "corners_mean",
+        "odd"
+    ]]
+
+    y = df["result"]
+
+    model = XGBClassifier()
+    model.fit(X, y)
+
+    joblib.dump(model, MODEL_PATH)
+
+    print("🧠 IA treinada com sucesso")
+
 # EXECUÇÃO
-# -----------------------------
-if __name__ == "__main__":
-    update_dataset()
+update_dataset()
+train_model()
