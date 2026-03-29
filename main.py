@@ -66,7 +66,7 @@ def run():
                     continue
 
                 # -----------------------------
-                # IA + MODELO COMBINADO
+                # IA + MODELO (CORRETO)
                 # -----------------------------
                 try:
                     ml_prob_raw = predict_bet(
@@ -77,9 +77,9 @@ def run():
                     print(f"Erro na IA: {e}")
                     ml_prob_raw = 0.5
 
-                # 🔥 COMBINAÇÃO INTELIGENTE
+                # 👇 FORA DO TRY (CORRETO)
                 ml_prob = ((prob_modelo * 0.7) + (ml_prob_raw * 0.3)) * 1.15
-ml_prob = min(ml_prob, 0.85)
+                ml_prob = min(ml_prob, 0.85)
 
                 # -----------------------------
                 # VALUE
@@ -100,9 +100,9 @@ ml_prob = min(ml_prob, 0.85)
                     continue
 
                 # -----------------------------
-                # DECISÃO FINAL
+                # DECISÃO FINAL (LIBERADA)
                 # -----------------------------
-                if val > VALUE_THRESHOLD and ml_prob > 0.48:
+                if val > -0.01 and ml_prob > 0.48:
                     print("✅ Aposta aprovada")
 
                     all_bets.append({
