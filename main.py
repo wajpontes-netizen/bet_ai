@@ -30,9 +30,6 @@ def corners_over(mean, line=9.5):
 def value(prob, odd):
     return prob - (1 / odd)
 
-def kelly(prob, odd):
-    return ((prob * odd) - 1) / (odd - 1)
-
 # -----------------------------
 # EXECUÇÃO
 # -----------------------------
@@ -52,9 +49,11 @@ def run():
             over = over25(matrix)
             corners = corners_over(g["corners_mean"])
 
+            linha_cantos = 9.5
+
             bets = {
                 "Over 2.5 Gols": (over, g["odds"].get("over25", 0)),
-                "Over Cantos": (corners, 1.90)
+                f"Over {linha_cantos} Cantos": (corners, 1.90)
             }
 
             for name, (prob_modelo, odd) in bets.items():
@@ -65,9 +64,7 @@ def run():
                     print("❌ Odd zerada")
                     continue
 
-                # -----------------------------
-                # IA + MODELO (CORRETO)
-                # -----------------------------
+                # IA + MODELO
                 try:
                     ml_prob_raw = predict_bet(
                         g["home_xg"] + g["away_xg"],
@@ -77,20 +74,14 @@ def run():
                     print(f"Erro na IA: {e}")
                     ml_prob_raw = 0.5
 
-                # 👇 FORA DO TRY (CORRETO)
                 ml_prob = ((prob_modelo * 0.7) + (ml_prob_raw * 0.3)) * 1.15
                 ml_prob = min(ml_prob, 0.85)
 
-                # -----------------------------
-                # VALUE
-                # -----------------------------
                 val = value(ml_prob, odd)
 
                 print(f"📊 Prob Final: {round(ml_prob,2)} | Odd: {odd} | Value: {round(val,3)}")
 
-                # -----------------------------
                 # FILTRO
-                # -----------------------------
                 try:
                     if not apply_filters(g, ml_prob, odd):
                         print("⛔ Reprovado no filtro")
@@ -99,9 +90,7 @@ def run():
                     print(f"Erro no filtro: {e}")
                     continue
 
-                # -----------------------------
-                # DECISÃO FINAL (LIBERADA)
-                # -----------------------------
+                # DECISÃO
                 if val > -0.01 and ml_prob > 0.48:
                     print("✅ Aposta aprovada")
 
@@ -111,7 +100,8 @@ def run():
                         "mercado": name,
                         "prob": ml_prob,
                         "odd": odd,
-                        "value": val
+                        "value": val,
+                        "data": g.get("date", "N/A")
                     })
                 else:
                     print("❌ Sem valor suficiente")
@@ -127,28 +117,22 @@ def run():
         print("\n⚠️ Nenhuma aposta encontrada")
     else:
         all_bets = sorted(all_bets, key=lambda x: x["value"], reverse=True)
+        all_bets = all_bets[:5]
 
         print("\n🔥 TOP APOSTAS:\n")
 
-        for bet in all_bets[:5]:
-
-            kelly_value = kelly(bet["prob"], bet["odd"])
-
-            if kelly_value <= 0:
-                stake = 0
-            else:
-                stake = kelly_value * BANKROLL * 0.2
+        for bet in all_bets:
 
             msg = f"""
 🔥 VALUE BET
 
 🏆 {bet['jogo']}
+🕒 Horário: {bet['data']}
 🏆 Liga: {bet['liga']}
 📊 Mercado: {bet['mercado']}
 📈 Prob: {round(bet['prob'],2)}
 💰 Odd: {bet['odd']}
 💎 Value: {round(bet['value'],2)}
-💵 Stake: R${round(stake,2)}
 """
 
             print(msg)
@@ -166,7 +150,7 @@ def run():
 
 
 # -----------------------------
-# LOOP 24H
+# LOOP
 # -----------------------------
 if __name__ == "__main__":
     while True:
