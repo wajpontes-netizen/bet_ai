@@ -78,7 +78,8 @@ def run():
                     ml_prob_raw = 0.5
 
                 # 🔥 COMBINAÇÃO INTELIGENTE
-                ml_prob = (prob_modelo * 0.7) + (ml_prob_raw * 0.3)
+                ml_prob = ((prob_modelo * 0.7) + (ml_prob_raw * 0.3)) * 1.15
+ml_prob = min(ml_prob, 0.85)
 
                 # -----------------------------
                 # VALUE
