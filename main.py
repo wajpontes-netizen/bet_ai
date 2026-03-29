@@ -76,7 +76,7 @@ def run():
                 val = value(ml_prob, odd)
 
                 # 🔥 EXTRA APLICADO AQUI
-                if val > VALUE_THRESHOLD and ml_prob > 0.52:
+                if val > VALUE_THRESHOLD and ml_prob > 0.50:
                     all_bets.append({
                         "jogo": g["match"],
                         "liga": g["league"],
