@@ -24,7 +24,7 @@ def score_matrix(home_xg, away_xg):
 def over25(matrix):
     return sum(matrix[i][j] for i in range(len(matrix)) for j in range(len(matrix)) if i + j > 2.5)
 
-def corners_over(mean, line=9.5):
+def corners_over(mean, line):
     return 1 - poisson.cdf(line, mean)
 
 def value(prob, odd):
@@ -47,9 +47,10 @@ def run():
             matrix = score_matrix(g["home_xg"], g["away_xg"])
 
             over = over25(matrix)
-            corners = corners_over(g["corners_mean"])
 
-            linha_cantos = 9.5
+            # 🎯 linha dinâmica de cantos
+            linha_cantos = max(7.5, round(g["corners_mean"]) - 0.5)
+            corners = corners_over(g["corners_mean"], linha_cantos)
 
             bets = {
                 "Over 2.5 Gols": (over, g["odds"].get("over25", 0)),
@@ -64,7 +65,7 @@ def run():
                     print("❌ Odd zerada")
                     continue
 
-                # IA + MODELO
+                # IA real (sem boost fake)
                 try:
                     ml_prob_raw = predict_bet(
                         g["home_xg"] + g["away_xg"],
@@ -74,8 +75,8 @@ def run():
                     print(f"Erro na IA: {e}")
                     ml_prob_raw = 0.5
 
-                ml_prob = ((prob_modelo * 0.7) + (ml_prob_raw * 0.3)) * 1.15
-                ml_prob = min(ml_prob, 0.85)
+                # 🔥 combinação real
+                ml_prob = (prob_modelo * 0.8) + (ml_prob_raw * 0.2)
 
                 val = value(ml_prob, odd)
 
@@ -90,8 +91,8 @@ def run():
                     print(f"Erro no filtro: {e}")
                     continue
 
-                # DECISÃO
-                if val > -0.01 and ml_prob > 0.48:
+                # DECISÃO MAIS PROFISSIONAL
+                if val > 0.02 and ml_prob > 0.52:
                     print("✅ Aposta aprovada")
 
                     all_bets.append({
@@ -117,6 +118,8 @@ def run():
         print("\n⚠️ Nenhuma aposta encontrada")
     else:
         all_bets = sorted(all_bets, key=lambda x: x["value"], reverse=True)
+
+        # 🔥 só TOP 5 (qualidade)
         all_bets = all_bets[:5]
 
         print("\n🔥 TOP APOSTAS:\n")
@@ -150,7 +153,7 @@ def run():
 
 
 # -----------------------------
-# LOOP
+# LOOP 24H
 # -----------------------------
 if __name__ == "__main__":
     while True:
