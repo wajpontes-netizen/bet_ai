@@ -34,7 +34,7 @@ def kelly(prob, odd):
     return ((prob * odd) - 1) / (odd - 1)
 
 # -----------------------------
-# FUNÇÃO PRINCIPAL
+# EXECUÇÃO
 # -----------------------------
 def run():
     games = get_games()
@@ -59,24 +59,48 @@ def run():
 
             for name, (prob, odd) in bets.items():
 
+                print(f"\n➡️ Testando mercado: {name}")
+
                 if odd == 0:
+                    print("❌ Odd zerada")
                     continue
 
-                # IA
-                ml_prob = predict_bet(
-                    g["home_xg"] + g["away_xg"],
-                    odd
-                )
+                # -----------------------------
+                # IA (com proteção)
+                # -----------------------------
+                try:
+                    ml_prob = predict_bet(
+                        g["home_xg"] + g["away_xg"],
+                        odd
+                    )
+                except Exception as e:
+                    print(f"Erro na IA: {e}")
+                    ml_prob = 0.5  # fallback
 
-                # FILTRO PROFISSIONAL
-                if not apply_filters(g, ml_prob, odd):
-                    continue
-
-                # VALUE BET
+                # -----------------------------
+                # VALUE
+                # -----------------------------
                 val = value(ml_prob, odd)
 
-                # 🔥 EXTRA APLICADO AQUI
-                if val > VALUE_THRESHOLD and ml_prob > 0.50:
+                print(f"📊 Prob: {round(ml_prob,2)} | Odd: {odd} | Value: {round(val,3)}")
+
+                # -----------------------------
+                # FILTRO
+                # -----------------------------
+                try:
+                    if not apply_filters(g, ml_prob, odd):
+                        print("⛔ Reprovado no filtro")
+                        continue
+                except Exception as e:
+                    print(f"Erro no filtro: {e}")
+                    continue
+
+                # -----------------------------
+                # DECISÃO FINAL
+                # -----------------------------
+                if val > VALUE_THRESHOLD and ml_prob > 0.48:
+                    print("✅ Aposta aprovada")
+
                     all_bets.append({
                         "jogo": g["match"],
                         "liga": g["league"],
@@ -85,13 +109,15 @@ def run():
                         "odd": odd,
                         "value": val
                     })
+                else:
+                    print("❌ Sem valor suficiente")
 
         except Exception as e:
-            print(f"Erro: {e}")
+            print(f"Erro geral: {e}")
             continue
 
     # -----------------------------
-    # RESULTADOS
+    # RESULTADO FINAL
     # -----------------------------
     if not all_bets:
         print("\n⚠️ Nenhuma aposta encontrada")
@@ -104,7 +130,6 @@ def run():
 
             kelly_value = kelly(bet["prob"], bet["odd"])
 
-            # gestão de banca segura
             if kelly_value <= 0:
                 stake = 0
             else:
@@ -130,7 +155,7 @@ def run():
                 pass
 
     # -----------------------------
-    # AUTO-APRENDIZADO
+    # AUTO UPDATE
     # -----------------------------
     print("\n🔄 Atualizando base...")
     os.system("python auto_update.py")
