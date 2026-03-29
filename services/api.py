@@ -38,7 +38,7 @@ def get_games():
                                     over25 = float(val["odd"])
 
             if over25 == 0:
-                continue
+    over25 = 1.85  # fallback inteligente
 
             # -----------------------------
             # ESTATÍSTICAS REAIS (simplificado)
@@ -63,8 +63,8 @@ def get_games():
             # -----------------------------
             # xG APROXIMADO REALISTA
             # -----------------------------
-            home_xg = home_shots * 0.1
-            away_xg = away_shots * 0.1
+            home_xg = max(0.8, home_shots * 0.1)
+away_xg = max(0.8, away_shots * 0.1)
 
             corners_mean = 9 + (home_shots + away_shots) * 0.05
 
