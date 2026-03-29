@@ -2,7 +2,7 @@
 # BANCA E GESTÃO
 # -----------------------------
 BANKROLL = 1000  # valor total da banca (R$)
-VALUE_THRESHOLD = 0.005
+VALUE_THRESHOLD = -0.02
 MIN_PROBABILITY = 0.50
 MIN_ODD = 1.50
 

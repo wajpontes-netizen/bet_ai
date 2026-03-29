@@ -78,7 +78,7 @@ def run():
                     ml_prob_raw = 0.5
 
                 # 🔥 COMBINAÇÃO INTELIGENTE
-                ml_prob = (ml_prob_raw + prob_modelo) / 2
+                ml_prob = (prob_modelo * 0.7) + (ml_prob_raw * 0.3)
 
                 # -----------------------------
                 # VALUE
