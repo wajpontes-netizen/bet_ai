@@ -2,7 +2,7 @@
 # BANCA E GESTÃO
 # -----------------------------
 BANKROLL = 1000  # valor total da banca (R$)
-VALUE_THRESHOLD = 0.03  # mínimo de valor para considerar aposta
+VALUE_THRESHOLD = 0.01  # mínimo de valor para considerar aposta
 
 # -----------------------------
 # TELEGRAM (OBRIGATÓRIO PRA ALERTAS)
