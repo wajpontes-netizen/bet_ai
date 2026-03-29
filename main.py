@@ -1,6 +1,7 @@
 import numpy as np
 from scipy.stats import poisson
 import os
+import time
 
 from config import BANKROLL, VALUE_THRESHOLD
 from services.api import get_games
@@ -21,12 +22,7 @@ def score_matrix(home_xg, away_xg):
     return matrix
 
 def over25(matrix):
-    total = 0
-    for i in range(len(matrix)):
-        for j in range(len(matrix)):
-            if i + j > 2.5:
-                total += matrix[i][j]
-    return total
+    return sum(matrix[i][j] for i in range(len(matrix)) for j in range(len(matrix)) if i + j > 2.5)
 
 def corners_over(mean, line=9.5):
     return 1 - poisson.cdf(line, mean)
@@ -38,82 +34,72 @@ def kelly(prob, odd):
     return ((prob * odd) - 1) / (odd - 1)
 
 # -----------------------------
-# EXECUÇÃO
+# FUNÇÃO PRINCIPAL
 # -----------------------------
-games = get_games()
+def run():
+    games = get_games()
 
-print(f"\n📊 Jogos encontrados: {len(games)}")
+    print(f"\n📊 Jogos encontrados: {len(games)}")
 
-all_bets = []
+    all_bets = []
 
-for g in games:
-    try:
-        print(f"\n🔎 Analisando: {g['match']} ({g['league']})")
+    for g in games:
+        try:
+            print(f"\n🔎 Analisando: {g['match']} ({g['league']})")
 
-        matrix = score_matrix(g["home_xg"], g["away_xg"])
+            matrix = score_matrix(g["home_xg"], g["away_xg"])
 
-        over = over25(matrix)
-        corners = corners_over(g["corners_mean"])
+            over = over25(matrix)
+            corners = corners_over(g["corners_mean"])
 
-        bets = {
-            "Over 2.5 Gols": (over, g["odds"].get("over25", 0)),
-            "Over Cantos": (corners, 1.90)
-        }
+            bets = {
+                "Over 2.5 Gols": (over, g["odds"].get("over25", 0)),
+                "Over Cantos": (corners, 1.90)
+            }
 
-        for name, (prob, odd) in bets.items():
+            for name, (prob, odd) in bets.items():
 
-            if odd == 0:
-                continue
+                if odd == 0:
+                    continue
 
-            # -----------------------------
-            # IA (Machine Learning)
-            # -----------------------------
-            ml_prob = predict_bet(
-                g["home_xg"] + g["away_xg"],
-                odd
-            )
+                ml_prob = predict_bet(
+                    g["home_xg"] + g["away_xg"],
+                    odd
+                )
 
-            # -----------------------------
-            # FILTRO PROFISSIONAL
-            # -----------------------------
-            if not apply_filters(g, ml_prob, odd):
-                continue
+                if not apply_filters(g, ml_prob, odd):
+                    continue
 
-            # -----------------------------
-            # VALUE BET
-            # -----------------------------
-            val = value(ml_prob, odd)
+                val = value(ml_prob, odd)
 
-            if val > VALUE_THRESHOLD:
-                all_bets.append({
-                    "jogo": g["match"],
-                    "liga": g["league"],
-                    "mercado": name,
-                    "prob": ml_prob,
-                    "odd": odd,
-                    "value": val
-                })
+                if val > VALUE_THRESHOLD:
+                    all_bets.append({
+                        "jogo": g["match"],
+                        "liga": g["league"],
+                        "mercado": name,
+                        "prob": ml_prob,
+                        "odd": odd,
+                        "value": val
+                    })
 
-    except Exception as e:
-        print(f"Erro: {e}")
-        continue
+        except Exception as e:
+            print(f"Erro: {e}")
+            continue
 
-# -----------------------------
-# RANKING FINAL
-# -----------------------------
-if not all_bets:
-    print("\n⚠️ Nenhuma aposta encontrada hoje")
-else:
-    all_bets = sorted(all_bets, key=lambda x: x["value"], reverse=True)
+    # -----------------------------
+    # RESULTADO
+    # -----------------------------
+    if not all_bets:
+        print("\n⚠️ Nenhuma aposta encontrada")
+    else:
+        all_bets = sorted(all_bets, key=lambda x: x["value"], reverse=True)
 
-    print("\n🔥 TOP APOSTAS DO DIA:\n")
+        print("\n🔥 TOP APOSTAS:\n")
 
-    top = all_bets[:5]
+        for bet in all_bets[:5]:
+            stake = kelly(bet["prob"], bet["odd"]) * BANKROLL * 0.25
 
-    for bet in top:
-        stake = kelly(bet["prob"], bet["odd"]) * BANKROLL * 0.25
-
-        msg = f"""
+            msg = f"""
 🔥 VALUE BET
 
 🏆 {bet['jogo']}
@@ -125,11 +111,26 @@ else:
 💵 Stake: R${round(stake,2)}
 """
 
-        print(msg)
-        send(msg)
+            print(msg)
+
+            try:
+                send(msg)
+            except:
+                pass
+
+    # -----------------------------
+    # AUTO-APRENDIZADO
+    # -----------------------------
+    print("\n🔄 Atualizando base...")
+    os.system("python auto_update.py")
+
 
 # -----------------------------
-# AUTO-APRENDIZADO
+# LOOP 24H (NÚVEM)
 # -----------------------------
-print("\n🔄 Atualizando base de dados...")
-os.system("python auto_update.py")
+if __name__ == "__main__":
+    while True:
+        print("\n🚀 Iniciando análise...")
+        run()
+        print("\n⏳ Aguardando 1 hora...")
+        time.sleep(3600)
