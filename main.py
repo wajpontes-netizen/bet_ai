@@ -5,6 +5,7 @@ import time
 import pandas as pd
 
 from services.api import get_games
+from services.stats import get_extra_stats
 from ml_model import predict_bet
 from services.telegram import send
 
@@ -65,7 +66,6 @@ def run():
     print("\n🚀 Iniciando análise...")
 
     games = get_games()
-
     print(f"📊 Jogos encontrados: {len(games)}")
 
     all_bets = []
@@ -74,8 +74,10 @@ def run():
         try:
             print(f"\n🔎 Analisando: {g['match']} ({g['league']})")
 
-            matrix = score_matrix(g["home_xg"], g["away_xg"])
+            # EXTRA DATA (multi-api futuro)
+            extra = get_extra_stats(g)
 
+            matrix = score_matrix(g["home_xg"], g["away_xg"])
             prob_over = over25(matrix)
 
             linha_cantos = max(7.5, round(g["corners_mean"]) - 0.5)
@@ -91,19 +93,17 @@ def run():
                 if odd == 0:
                     continue
 
-                # IA
-                try:
-                    ml_prob = predict_bet(
-                        g["home_xg"],
-                        g["away_xg"],
-                        g["corners_mean"],
-                        odd
-                    )
-                except:
-                    ml_prob = 0.5
+                # IA AVANÇADA
+                ml_prob = predict_bet(
+                    g["home_xg"],
+                    g["away_xg"],
+                    g["corners_mean"],
+                    odd,
+                    extra
+                )
 
-                # PROB FINAL
-                prob_final = (prob_modelo * 0.7) + (ml_prob * 0.3)
+                # COMBINAÇÃO FINAL
+                prob_final = (prob_modelo * 0.6) + (ml_prob * 0.4)
 
                 val = value(prob_final, odd)
 
@@ -156,9 +156,7 @@ def run():
 
         print("\n🔥 TOP APOSTAS:\n")
 
-        top = all_bets[:3]
-
-        for bet in top:
+        for bet in all_bets[:3]:
             msg = f"""
 🔥 VALUE BET
 

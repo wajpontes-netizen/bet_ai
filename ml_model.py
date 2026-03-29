@@ -1,68 +1,32 @@
-import pandas as pd
+import numpy as np
 from xgboost import XGBClassifier
-import os
 
-MODEL_PATH = "model.pkl"
-DATA_PATH = "data/historico.csv"
+# modelo simples (depois vamos treinar melhor)
+model = XGBClassifier()
 
-# -----------------------------
-# TREINAR MODELO
-# -----------------------------
-def train_model():
-    if not os.path.exists(DATA_PATH):
-        print("⚠️ Sem histórico para treinar IA")
-        return None
+def predict_bet(home_xg, away_xg, corners, odd, extra):
 
-    df = pd.read_csv(DATA_PATH)
+    try:
+        features = np.array([[
+            home_xg,
+            away_xg,
+            corners,
 
-    if len(df) < 20:
-        print("⚠️ Poucos dados para treinar IA")
-        return None
+            extra["home_goals_avg"],
+            extra["away_goals_avg"],
+            extra["home_conceded_avg"],
+            extra["away_conceded_avg"],
+            extra["home_form"],
+            extra["away_form"],
+            extra["shots_home"],
+            extra["shots_away"],
 
-    X = df[["home_xg", "away_xg", "corners_mean", "odd"]]
-    y = df["resultado"]
+            odd
+        ]])
 
-    model = XGBClassifier(
-        n_estimators=100,
-        max_depth=3,
-        learning_rate=0.1,
-        use_label_encoder=False,
-        eval_metric="logloss"
-    )
+        prob = model.predict_proba(features)[0][1]
 
-    model.fit(X, y)
+    except:
+        prob = 0.5
 
-    return model
-
-# -----------------------------
-# CARREGAR OU TREINAR
-# -----------------------------
-_model = None
-
-def get_model():
-    global _model
-
-    if _model is None:
-        _model = train_model()
-
-    return _model
-
-# -----------------------------
-# PREVISÃO
-# -----------------------------
-def predict_bet(home_xg, away_xg, corners_mean, odd):
-    model = get_model()
-
-    if model is None:
-        return 0.5  # fallback neutro
-
-    X = pd.DataFrame([{
-        "home_xg": home_xg,
-        "away_xg": away_xg,
-        "corners_mean": corners_mean,
-        "odd": odd
-    }])
-
-    prob = model.predict_proba(X)[0][1]
-
-    return float(prob)
+    return prob
