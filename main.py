@@ -57,7 +57,7 @@ def run():
                 "Over Cantos": (corners, 1.90)
             }
 
-            for name, (prob, odd) in bets.items():
+            for name, (prob_modelo, odd) in bets.items():
 
                 print(f"\n➡️ Testando mercado: {name}")
 
@@ -66,23 +66,26 @@ def run():
                     continue
 
                 # -----------------------------
-                # IA (com proteção)
+                # IA + MODELO COMBINADO
                 # -----------------------------
                 try:
-                    ml_prob = predict_bet(
+                    ml_prob_raw = predict_bet(
                         g["home_xg"] + g["away_xg"],
                         odd
                     )
                 except Exception as e:
                     print(f"Erro na IA: {e}")
-                    ml_prob = 0.5  # fallback
+                    ml_prob_raw = 0.5
+
+                # 🔥 COMBINAÇÃO INTELIGENTE
+                ml_prob = (ml_prob_raw + prob_modelo) / 2
 
                 # -----------------------------
                 # VALUE
                 # -----------------------------
                 val = value(ml_prob, odd)
 
-                print(f"📊 Prob: {round(ml_prob,2)} | Odd: {odd} | Value: {round(val,3)}")
+                print(f"📊 Prob Final: {round(ml_prob,2)} | Odd: {odd} | Value: {round(val,3)}")
 
                 # -----------------------------
                 # FILTRO
@@ -117,7 +120,7 @@ def run():
             continue
 
     # -----------------------------
-    # RESULTADO FINAL
+    # RESULTADOS
     # -----------------------------
     if not all_bets:
         print("\n⚠️ Nenhuma aposta encontrada")
@@ -141,7 +144,7 @@ def run():
 🏆 {bet['jogo']}
 🏆 Liga: {bet['liga']}
 📊 Mercado: {bet['mercado']}
-📈 Prob IA: {round(bet['prob'],2)}
+📈 Prob: {round(bet['prob'],2)}
 💰 Odd: {bet['odd']}
 💎 Value: {round(bet['value'],2)}
 💵 Stake: R${round(stake,2)}
