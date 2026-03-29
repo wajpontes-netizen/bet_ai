@@ -62,14 +62,17 @@ def run():
                 if odd == 0:
                     continue
 
+                # IA
                 ml_prob = predict_bet(
                     g["home_xg"] + g["away_xg"],
                     odd
                 )
 
+                # Filtro
                 if not apply_filters(g, ml_prob, odd):
                     continue
 
+                # Value bet
                 val = value(ml_prob, odd)
 
                 if val > VALUE_THRESHOLD:
@@ -87,7 +90,7 @@ def run():
             continue
 
     # -----------------------------
-    # RESULTADO
+    # RESULTADOS
     # -----------------------------
     if not all_bets:
         print("\n⚠️ Nenhuma aposta encontrada")
@@ -97,7 +100,14 @@ def run():
         print("\n🔥 TOP APOSTAS:\n")
 
         for bet in all_bets[:5]:
-            stake = kelly(bet["prob"], bet["odd"]) * BANKROLL * 0.25
+
+            kelly_value = kelly(bet["prob"], bet["odd"])
+
+            # gestão de banca segura
+            if kelly_value <= 0:
+                stake = 0
+            else:
+                stake = kelly_value * BANKROLL * 0.2
 
             msg = f"""
 🔥 VALUE BET
@@ -126,7 +136,7 @@ def run():
 
 
 # -----------------------------
-# LOOP 24H (NÚVEM)
+# LOOP 24H
 # -----------------------------
 if __name__ == "__main__":
     while True:
