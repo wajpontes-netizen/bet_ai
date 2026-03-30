@@ -1,7 +1,7 @@
 import time
 from datetime import datetime
 from services.aggregator import get_games
-from services.telegram import enviar_telegram  # IMPORTANTE
+from services.telegram import enviar_telegram
 
 # =========================
 # CONFIG
@@ -56,9 +56,10 @@ def run():
         jogos = get_games()
         print(f"📊 Jogos encontrados: {len(jogos)}")
 
+        # 🔥 Sem jogos → tenta depois
         if not jogos:
-            print("⚠️ Sem jogos")
-            time.sleep(3600)
+            print("⚠️ Nenhum jogo disponível. Tentando novamente em 30 min...\n")
+            time.sleep(1800)
             continue
 
         apostas = []
@@ -67,9 +68,9 @@ def run():
             home = jogo["home"]
             away = jogo["away"]
             league = jogo["league"]
-            data = formatar_data(jogo["date"])
+            data_formatada = formatar_data(jogo["date"])
 
-            jogo_id = f"{home}_{away}_{data}"
+            jogo_id = f"{home}_{away}_{data_formatada}"
 
             if jogo_id in enviados:
                 continue
@@ -83,42 +84,45 @@ def run():
                 prob = prever_probabilidade()
                 value = calcular_value(prob, odd)
 
+                # 🔥 FILTRO PRINCIPAL
                 if prob < MIN_PROB or value < MIN_VALUE:
-                    continue  # 🔥 FILTRA ANTES (ESSENCIAL)
+                    continue
 
                 tipo = classificar_aposta(prob, value)
 
-                aposta = {
+                apostas.append({
                     "id": jogo_id,
                     "liga": league,
                     "home": home,
                     "away": away,
-                    "data": data,
+                    "data": data_formatada,
                     "mercado": nome,
                     "prob": prob,
                     "odd": odd,
                     "value": value,
                     "tipo": tipo
-                }
-
-                apostas.append(aposta)
+                })
 
         # 🔥 ORDENA MELHORES
         apostas = sorted(apostas, key=lambda x: x["value"], reverse=True)
 
-        # 🔥 LIMITA ENTRE 15 E 20
+        # 🔥 LIMITA TOP
         apostas = apostas[:TOP_MAX]
 
+        # 🔥 GARANTE ENVIO (mesmo com poucos jogos)
         if len(apostas) < TOP_MIN:
-            print("⚠️ Poucas apostas boas")
-            time.sleep(3600)
+            print("⚠️ Poucas apostas boas, enviando mesmo assim...\n")
+
+        if not apostas:
+            print("⚠️ Nenhuma aposta encontrada\n")
+            time.sleep(1800)
             continue
 
-        print(f"🔥 Enviando {len(apostas)} apostas...")
+        print(f"🔥 Enviando {len(apostas)} apostas...\n")
 
         for aposta in apostas:
             msg = f"""
-🚀 OPORTUNIDADE
+🚀 <b>OPORTUNIDADE</b>
 {aposta['tipo']}
 
 🏆 {aposta['liga']}
