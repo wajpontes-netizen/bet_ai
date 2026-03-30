@@ -1,69 +1,41 @@
 import pandas as pd
 import os
-from xgboost import XGBClassifier
-import joblib
 
-PENDING_PATH = "data/pending_bets.csv"
-DATASET_PATH = "data/dataset.csv"
-MODEL_PATH = "model.pkl"
+DATASET_PATH = "dataset.csv"
+PENDING_PATH = "pending_bets.csv"
 
 def update_dataset():
+    print("📊 Atualizando dataset...")
 
+    # Verifica se arquivo existe
     if not os.path.exists(PENDING_PATH):
-        print("⚠️ Sem dados novos")
+        print("⚠️ pending_bets não existe")
+        return
+
+    # Verifica se está vazio
+    if os.stat(PENDING_PATH).st_size == 0:
+        print("⚠️ pending_bets vazio")
         return
 
     try:
-        df = pd.read_csv(PENDING_PATH)
-    except:
-        print("⚠️ Arquivo vazio")
-        return
+        df_pending = pd.read_csv(PENDING_PATH)
 
-    if df.empty:
-        print("⚠️ Sem linhas")
-        return
+        if df_pending.empty:
+            print("⚠️ Sem dados no pending")
+            return
 
-    # SIMULA RESULTADO (depois ligamos API real)
-    df["result"] = df["home_xg"] + df["away_xg"] > 2.5
+        # Criar dataset se não existir
+        if not os.path.exists(DATASET_PATH):
+            df_pending.to_csv(DATASET_PATH, index=False)
+        else:
+            df_dataset = pd.read_csv(DATASET_PATH)
+            df_final = pd.concat([df_dataset, df_pending])
+            df_final.to_csv(DATASET_PATH, index=False)
 
-    if os.path.exists(DATASET_PATH):
-        old = pd.read_csv(DATASET_PATH)
-        df = pd.concat([old, df])
+        # Limpa pending
+        open(PENDING_PATH, "w").close()
 
-    df.to_csv(DATASET_PATH, index=False)
+        print("✅ Dataset atualizado")
 
-    os.remove(PENDING_PATH)
-
-    print("✅ Dataset atualizado")
-
-def train_model():
-
-    if not os.path.exists(DATASET_PATH):
-        print("⚠️ Sem dataset")
-        return
-
-    df = pd.read_csv(DATASET_PATH)
-
-    if len(df) < 50:
-        print("⚠️ Poucos dados para treinar IA")
-        return
-
-    X = df[[
-        "home_xg",
-        "away_xg",
-        "corners_mean",
-        "odd"
-    ]]
-
-    y = df["result"]
-
-    model = XGBClassifier()
-    model.fit(X, y)
-
-    joblib.dump(model, MODEL_PATH)
-
-    print("🧠 IA treinada com sucesso")
-
-# EXECUÇÃO
-update_dataset()
-train_model()
+    except Exception as e:
+        print("Erro ao atualizar dataset:", e)
