@@ -1,47 +1,56 @@
 import time
 from datetime import datetime
-
 from services.aggregator import get_games
 
-# ==============================
-# FILTRO INTELIGENTE PROFISSIONAL
-# ==============================
+# =========================
+# CONFIG
+# =========================
+MIN_VALUE = 0.08
+MIN_PROB = 0.55
+TOP_N = 5
 
-def avaliar_aposta(prob, odd):
-    value = prob * odd - 1
+# =========================
+# FORMATAR DATA
+# =========================
+def formatar_data(data_iso):
+    try:
+        dt = datetime.fromisoformat(data_iso.replace("Z", "+00:00"))
+        return dt.strftime("%d/%m %H:%M")
+    except:
+        return data_iso
 
-    if prob >= 0.63 and value >= 0.15:
-        return "PREMIUM", value
+# =========================
+# CALCULAR VALUE
+# =========================
+def calcular_value(prob, odd):
+    return (prob * odd) - 1
 
-    elif prob >= 0.57 and value >= 0.08:
-        return "BOA", value
+# =========================
+# CLASSIFICAR APOSTA
+# =========================
+def classificar_aposta(prob, value):
+    if prob >= 0.62 and value >= 0.12:
+        return "🔥 PREMIUM"
+    elif prob >= 0.58 and value >= 0.08:
+        return "✅ BOA"
+    else:
+        return None
 
-    elif prob >= 0.53 and value >= 0.03:
-        return "RISCO", value
+# =========================
+# IA SIMPLES (placeholder)
+# =========================
+def prever_probabilidade():
+    # depois vamos substituir por IA real
+    import random
+    return round(random.uniform(0.55, 0.66), 2)
 
-    return None, value
-
-# ==============================
-# SIMULAÇÃO DE IA (MELHORAR DEPOIS)
-# ==============================
-
-def calcular_probabilidade(jogo, mercado):
-    # Aqui depois você liga com sua IA real
-    base = 0.55
-
-    if mercado == "over_gols":
-        return base + 0.10
-    elif mercado == "over_cantos":
-        return base + 0.08
-
-    return base
-
-# ==============================
+# =========================
 # LOOP PRINCIPAL
-# ==============================
-
-def main():
+# =========================
+def run():
     print("🚀 Iniciando sistema profissional...")
+
+    jogos_processados = set()
 
     while True:
         jogos = get_games()
@@ -50,53 +59,82 @@ def main():
 
         if not jogos:
             print("⚠️ Nenhum jogo disponível")
-            print("⏳ Aguardando 1 hora...")
             time.sleep(3600)
             continue
 
+        apostas_boas = []
+
         for jogo in jogos:
-            try:
-                time_str = jogo.get("time", "--:--")
-                date_str = jogo.get("date", "--/--")
-                home = jogo.get("home", "Time A")
-                away = jogo.get("away", "Time B")
-                league = jogo.get("league", "Liga")
+            home = jogo["home"]
+            away = jogo["away"]
+            league = jogo["league"]
+            date_str = jogo["date"]
 
-                print(f"\n🔎 {home} vs {away} ({league}) - {date_str} {time_str}")
+            id_jogo = f"{home}_{away}_{date_str}"
 
-                # ==============================
-                # MERCADOS
-                # ==============================
-                mercados = [
-                    ("Over 2.5 Gols", "over_gols", 1.85),
-                    ("Over 9.5 Cantos", "over_cantos", 1.90)
-                ]
+            # 🚫 evitar duplicados
+            if id_jogo in jogos_processados:
+                continue
+            jogos_processados.add(id_jogo)
 
-                for nome, key, odd in mercados:
-                    prob = calcular_probabilidade(jogo, key)
-                    tipo, value = avaliar_aposta(prob, odd)
+            data_formatada = formatar_data(date_str)
 
-                    print(f"➡️ {nome} | Prob: {prob:.2f} | Odd: {odd} | Value: {value:.3f}")
+            # =========================
+            # MERCADOS
+            # =========================
+            mercados = [
+                ("Over 2.5 Gols", 1.85),
+                ("Over 9.5 Cantos", 1.90)
+            ]
 
-                    if tipo:
-                        print(f"🔥 {tipo}")
-                        print("🚀 Entrada recomendada")
-                        print(f"🏆 {league}")
-                        print(f"⚽ {home} vs {away}")
-                        print(f"🕒 {date_str} {time_str}")
-                        print(f"📊 Mercado: {nome}")
-                        print(f"📈 Probabilidade: {int(prob*100)}%")
-                        print(f"💰 Odd: {odd}")
-                        print(f"📊 Value: {value:.3f}")
-                    else:
-                        print("❌ Filtro rejeitou")
+            for nome, odd in mercados:
+                prob = prever_probabilidade()
+                value = calcular_value(prob, odd)
+                tipo = classificar_aposta(prob, value)
 
-            except Exception as e:
-                print(f"Erro ao analisar jogo: {e}")
+                print(f"➡️ {nome} | Prob: {prob} | Odd: {odd} | Value: {round(value,3)}")
 
-        print("\n⏳ Aguardando 1 hora...")
+                if tipo:
+                    apostas_boas.append({
+                        "liga": league,
+                        "home": home,
+                        "away": away,
+                        "data": data_formatada,
+                        "mercado": nome,
+                        "prob": prob,
+                        "odd": odd,
+                        "value": value,
+                        "tipo": tipo
+                    })
+
+        # =========================
+        # FILTRO FINAL (TOP PICKS)
+        # =========================
+        apostas_boas = sorted(apostas_boas, key=lambda x: x["value"], reverse=True)
+        top_apostas = apostas_boas[:TOP_N]
+
+        if not top_apostas:
+            print("\n⚠️ Nenhuma aposta encontrada")
+        else:
+            print("\n🔥 TOP ENTRADAS DO DIA:\n")
+
+            for aposta in top_apostas:
+                print("🚀 OPORTUNIDADE")
+                print(f"{aposta['tipo']}")
+                print(f"🏆 {aposta['liga']}")
+                print(f"⚽ {aposta['home']} vs {aposta['away']}")
+                print(f"🕒 {aposta['data']}")
+                print(f"📊 {aposta['mercado']}")
+                print(f"📈 Probabilidade: {int(aposta['prob']*100)}%")
+                print(f"💰 Odd: {aposta['odd']}")
+                print(f"📊 Value: {round(aposta['value'],3)}")
+                print("-" * 30)
+
+        print("\n⏳ Aguardando 1 hora...\n")
         time.sleep(3600)
 
-
+# =========================
+# START
+# =========================
 if __name__ == "__main__":
-    main()
+    run()
