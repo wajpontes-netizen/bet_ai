@@ -1,61 +1,44 @@
 import time
 from datetime import datetime
+
 from services.aggregator import get_games
 
-MIN_PROB = 0.60
-MIN_VALUE = 0.02
+# ==============================
+# FILTRO INTELIGENTE PROFISSIONAL
+# ==============================
 
-def calcular_probabilidade():
-    # Simulação IA (depois ligamos com ML real)
-    import random
-    return round(random.uniform(0.55, 0.75), 2)
+def avaliar_aposta(prob, odd):
+    value = prob * odd - 1
 
-def analisar_jogo(jogo):
-    home = jogo.get("home")
-    away = jogo.get("away")
-    league = jogo.get("league")
-    date = jogo.get("date")
+    if prob >= 0.63 and value >= 0.15:
+        return "PREMIUM", value
 
-    try:
-        dt = datetime.fromisoformat(date)
-        horario = dt.strftime("%d/%m %H:%M")
-    except:
-        horario = "N/A"
+    elif prob >= 0.57 and value >= 0.08:
+        return "BOA", value
 
-    print(f"\n🔎 {home} vs {away} ({league}) - {horario}")
+    elif prob >= 0.53 and value >= 0.03:
+        return "RISCO", value
 
-    mercados = [
-        {"nome": "Over 2.5 Gols", "odd": 1.85},
-        {"nome": "Over 9.5 Cantos", "odd": 1.90}
-    ]
+    return None, value
 
-    for mercado in mercados:
-        prob = calcular_probabilidade()
-        odd = mercado["odd"]
+# ==============================
+# SIMULAÇÃO DE IA (MELHORAR DEPOIS)
+# ==============================
 
-        value = round((prob * odd) - 1, 3)
+def calcular_probabilidade(jogo, mercado):
+    # Aqui depois você liga com sua IA real
+    base = 0.55
 
-        print(f"➡️ {mercado['nome']} | Prob: {prob} | Odd: {odd} | Value: {value}")
+    if mercado == "over_gols":
+        return base + 0.10
+    elif mercado == "over_cantos":
+        return base + 0.08
 
-        if prob >= MIN_PROB and value >= MIN_VALUE:
-            print("✅ APOSTA BOA")
+    return base
 
-            print(f"""
-🔥 OPORTUNIDADE
-
-🏆 {league}
-⚽ {home} vs {away}
-🕒 {horario}
-
-📊 Mercado: {mercado['nome']}
-📈 Probabilidade: {int(prob*100)}%
-💰 Odd: {odd}
-📊 Value: {value}
-
-🚀 Entrada recomendada
-""")
-        else:
-            print("❌ Filtro rejeitou")
+# ==============================
+# LOOP PRINCIPAL
+# ==============================
 
 def main():
     print("🚀 Iniciando sistema profissional...")
@@ -67,12 +50,53 @@ def main():
 
         if not jogos:
             print("⚠️ Nenhum jogo disponível")
-        else:
-            for jogo in jogos:
-                analisar_jogo(jogo)
+            print("⏳ Aguardando 1 hora...")
+            time.sleep(3600)
+            continue
 
-        print("\n⏳ Aguardando 1 hora...\n")
+        for jogo in jogos:
+            try:
+                time_str = jogo.get("time", "--:--")
+                date_str = jogo.get("date", "--/--")
+                home = jogo.get("home", "Time A")
+                away = jogo.get("away", "Time B")
+                league = jogo.get("league", "Liga")
+
+                print(f"\n🔎 {home} vs {away} ({league}) - {date_str} {time_str}")
+
+                # ==============================
+                # MERCADOS
+                # ==============================
+                mercados = [
+                    ("Over 2.5 Gols", "over_gols", 1.85),
+                    ("Over 9.5 Cantos", "over_cantos", 1.90)
+                ]
+
+                for nome, key, odd in mercados:
+                    prob = calcular_probabilidade(jogo, key)
+                    tipo, value = avaliar_aposta(prob, odd)
+
+                    print(f"➡️ {nome} | Prob: {prob:.2f} | Odd: {odd} | Value: {value:.3f}")
+
+                    if tipo:
+                        print(f"🔥 {tipo}")
+                        print("🚀 Entrada recomendada")
+                        print(f"🏆 {league}")
+                        print(f"⚽ {home} vs {away}")
+                        print(f"🕒 {date_str} {time_str}")
+                        print(f"📊 Mercado: {nome}")
+                        print(f"📈 Probabilidade: {int(prob*100)}%")
+                        print(f"💰 Odd: {odd}")
+                        print(f"📊 Value: {value:.3f}")
+                    else:
+                        print("❌ Filtro rejeitou")
+
+            except Exception as e:
+                print(f"Erro ao analisar jogo: {e}")
+
+        print("\n⏳ Aguardando 1 hora...")
         time.sleep(3600)
+
 
 if __name__ == "__main__":
     main()
