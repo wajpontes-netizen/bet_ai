@@ -1,13 +1,15 @@
 import time
 from datetime import datetime
 from services.aggregator import get_games
+from services.telegram import enviar_telegram  # IMPORTANTE
 
 # =========================
 # CONFIG
 # =========================
-MIN_VALUE = 0.05
-MIN_PROB = 0.54
-TOP_N = 20
+MIN_VALUE = 0.10
+MIN_PROB = 0.58
+TOP_MIN = 15
+TOP_MAX = 20
 
 # =========================
 # FORMATAR DATA
@@ -26,65 +28,54 @@ def calcular_value(prob, odd):
     return (prob * odd) - 1
 
 # =========================
-# CLASSIFICAR APOSTA
+# CLASSIFICAÇÃO
 # =========================
 def classificar_aposta(prob, value):
-    if prob >= 0.62 and value >= 0.12:
+    if prob >= 0.63 and value >= 0.12:
         return "🔥 PREMIUM"
-    elif prob >= 0.58 and value >= 0.08:
+    elif prob >= 0.58 and value >= 0.10:
         return "✅ BOA"
-    else:
-        return "⚡ VALUE"
+    return None
 
 # =========================
-# IA SIMPLES (placeholder)
+# IA SIMPLES
 # =========================
 def prever_probabilidade():
     import random
-    return round(random.uniform(0.54, 0.66), 2)
+    return round(random.uniform(0.56, 0.66), 2)
 
 # =========================
 # LOOP PRINCIPAL
 # =========================
 def run():
-    print("🚀 Iniciando sistema profissional...")
+    print("🚀 Sistema iniciado...")
 
-    jogos_processados = set()
+    enviados = set()
 
     while True:
         jogos = get_games()
-
-        print(f"\n📊 Jogos encontrados: {len(jogos)}")
+        print(f"📊 Jogos encontrados: {len(jogos)}")
 
         if not jogos:
-            print("⚠️ Nenhum jogo disponível")
+            print("⚠️ Sem jogos")
             time.sleep(3600)
             continue
 
-        apostas_boas = []
+        apostas = []
 
         for jogo in jogos:
             home = jogo["home"]
             away = jogo["away"]
             league = jogo["league"]
-            date_str = jogo["date"]
+            data = formatar_data(jogo["date"])
 
-            id_jogo = f"{home}_{away}_{date_str}"
+            jogo_id = f"{home}_{away}_{data}"
 
-            # 🚫 evitar duplicados
-            if id_jogo in jogos_processados:
+            if jogo_id in enviados:
                 continue
-            jogos_processados.add(id_jogo)
 
-            data_formatada = formatar_data(date_str)
-
-            # =========================
-            # MERCADOS (MAIS VOLUME)
-            # =========================
             mercados = [
                 ("Over 2.5 Gols", 1.85),
-                ("Over 1.5 Gols", 1.35),
-                ("Ambas Marcam", 1.75),
                 ("Over 9.5 Cantos", 1.90)
             ]
 
@@ -92,48 +83,60 @@ def run():
                 prob = prever_probabilidade()
                 value = calcular_value(prob, odd)
 
-                print(f"➡️ {nome} | Prob: {prob} | Odd: {odd} | Value: {round(value,3)}")
+                if prob < MIN_PROB or value < MIN_VALUE:
+                    continue  # 🔥 FILTRA ANTES (ESSENCIAL)
 
-                # ✅ FILTRO REAL (AGORA FUNCIONA)
-                if prob >= MIN_PROB and value >= MIN_VALUE:
-                    tipo = classificar_aposta(prob, value)
+                tipo = classificar_aposta(prob, value)
 
-                    apostas_boas.append({
-                        "liga": league,
-                        "home": home,
-                        "away": away,
-                        "data": data_formatada,
-                        "mercado": nome,
-                        "prob": prob,
-                        "odd": odd,
-                        "value": value,
-                        "tipo": tipo
-                    })
+                aposta = {
+                    "id": jogo_id,
+                    "liga": league,
+                    "home": home,
+                    "away": away,
+                    "data": data,
+                    "mercado": nome,
+                    "prob": prob,
+                    "odd": odd,
+                    "value": value,
+                    "tipo": tipo
+                }
 
-        # =========================
-        # TOP PICKS
-        # =========================
-        apostas_boas = sorted(apostas_boas, key=lambda x: x["value"], reverse=True)
-        top_apostas = apostas_boas[:TOP_N]
+                apostas.append(aposta)
 
-        if not top_apostas:
-            print("\n⚠️ Nenhuma aposta encontrada")
-        else:
-            print("\n🔥 TOP ENTRADAS DO DIA:\n")
+        # 🔥 ORDENA MELHORES
+        apostas = sorted(apostas, key=lambda x: x["value"], reverse=True)
 
-            for aposta in top_apostas:
-                print("🚀 OPORTUNIDADE")
-                print(f"{aposta['tipo']}")
-                print(f"🏆 {aposta['liga']}")
-                print(f"⚽ {aposta['home']} vs {aposta['away']}")
-                print(f"🕒 {aposta['data']}")
-                print(f"📊 {aposta['mercado']}")
-                print(f"📈 Probabilidade: {int(aposta['prob']*100)}%")
-                print(f"💰 Odd: {aposta['odd']}")
-                print(f"📊 Value: {round(aposta['value'],3)}")
-                print("-" * 30)
+        # 🔥 LIMITA ENTRE 15 E 20
+        apostas = apostas[:TOP_MAX]
 
-        print("\n⏳ Aguardando 1 hora...\n")
+        if len(apostas) < TOP_MIN:
+            print("⚠️ Poucas apostas boas")
+            time.sleep(3600)
+            continue
+
+        print(f"🔥 Enviando {len(apostas)} apostas...")
+
+        for aposta in apostas:
+            msg = f"""
+🚀 OPORTUNIDADE
+{aposta['tipo']}
+
+🏆 {aposta['liga']}
+⚽ {aposta['home']} vs {aposta['away']}
+🕒 {aposta['data']}
+
+📊 {aposta['mercado']}
+📈 Prob: {int(aposta['prob']*100)}%
+💰 Odd: {aposta['odd']}
+📊 Value: {round(aposta['value'],3)}
+"""
+
+            enviar_telegram(msg)
+            enviados.add(aposta["id"])
+
+            time.sleep(2)  # evita flood
+
+        print("⏳ Aguardando 1 hora...\n")
         time.sleep(3600)
 
 # =========================
