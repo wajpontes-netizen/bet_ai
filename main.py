@@ -5,9 +5,9 @@ from services.aggregator import get_games
 # =========================
 # CONFIG
 # =========================
-MIN_VALUE = 0.08
-MIN_PROB = 0.55
-TOP_N = 5
+MIN_VALUE = 0.05
+MIN_PROB = 0.54
+TOP_N = 20
 
 # =========================
 # FORMATAR DATA
@@ -34,15 +34,14 @@ def classificar_aposta(prob, value):
     elif prob >= 0.58 and value >= 0.08:
         return "✅ BOA"
     else:
-        return None
+        return "⚡ VALUE"
 
 # =========================
 # IA SIMPLES (placeholder)
 # =========================
 def prever_probabilidade():
-    # depois vamos substituir por IA real
     import random
-    return round(random.uniform(0.55, 0.66), 2)
+    return round(random.uniform(0.54, 0.66), 2)
 
 # =========================
 # LOOP PRINCIPAL
@@ -80,21 +79,25 @@ def run():
             data_formatada = formatar_data(date_str)
 
             # =========================
-            # MERCADOS
+            # MERCADOS (MAIS VOLUME)
             # =========================
             mercados = [
                 ("Over 2.5 Gols", 1.85),
+                ("Over 1.5 Gols", 1.35),
+                ("Ambas Marcam", 1.75),
                 ("Over 9.5 Cantos", 1.90)
             ]
 
             for nome, odd in mercados:
                 prob = prever_probabilidade()
                 value = calcular_value(prob, odd)
-                tipo = classificar_aposta(prob, value)
 
                 print(f"➡️ {nome} | Prob: {prob} | Odd: {odd} | Value: {round(value,3)}")
 
-                if tipo:
+                # ✅ FILTRO REAL (AGORA FUNCIONA)
+                if prob >= MIN_PROB and value >= MIN_VALUE:
+                    tipo = classificar_aposta(prob, value)
+
                     apostas_boas.append({
                         "liga": league,
                         "home": home,
@@ -108,7 +111,7 @@ def run():
                     })
 
         # =========================
-        # FILTRO FINAL (TOP PICKS)
+        # TOP PICKS
         # =========================
         apostas_boas = sorted(apostas_boas, key=lambda x: x["value"], reverse=True)
         top_apostas = apostas_boas[:TOP_N]
