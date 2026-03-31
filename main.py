@@ -1,54 +1,92 @@
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from services.aggregator import get_games
 from services.telegram import enviar_telegram
 
 # =========================
 # CONFIG
 # =========================
-MIN_VALUE = 0.10
-MIN_PROB = 0.58
 TOP_MIN = 15
 TOP_MAX = 20
 
+LIGAS_BOAS = [
+    "Premier League",
+    "La Liga",
+    "Serie A",
+    "Bundesliga",
+    "Ligue 1",
+    "Brasileirão",
+    "UEFA Champions League",
+    "UEFA Europa League"
+    "Sul-amaricano"
+    "Libertadores"
+]
+
 # =========================
-# FORMATAR DATA
+# FORMATAR DATA (MANAUS)
 # =========================
 def formatar_data(data_iso):
     try:
         dt = datetime.fromisoformat(data_iso.replace("Z", "+00:00"))
+
+        # ajuste -4h (Manaus)
+        dt = dt - timedelta(hours=4)
+
         return dt.strftime("%d/%m %H:%M")
     except:
         return data_iso
 
 # =========================
-# CALCULAR VALUE
+# FILTRO TEMPO
 # =========================
+def jogo_valido(data_iso):
+    try:
+        dt = datetime.fromisoformat(data_iso.replace("Z", "+00:00"))
+        agora = datetime.utcnow()
+
+        minutos = (dt - agora).total_seconds() / 60
+
+        return 20 <= minutos <= 300  # 20min até 5h
+    except:
+        return False
+
+# =========================
+# IA PROFISSIONAL
+# =========================
+def calcular_probabilidade_real(odd, league):
+    prob = 1 / odd
+
+    if league in LIGAS_BOAS:
+        prob += 0.05
+    else:
+        prob -= 0.02
+
+    if odd <= 1.85:
+        prob += 0.03
+
+    return round(min(max(prob, 0.50), 0.80), 2)
+
 def calcular_value(prob, odd):
-    return (prob * odd) - 1
+    return round((prob * odd) - 1, 3)
+
+def calcular_score(prob, value):
+    return round((prob * 0.7) + (value * 0.3), 3)
 
 # =========================
 # CLASSIFICAÇÃO
 # =========================
 def classificar_aposta(prob, value):
-    if prob >= 0.63 and value >= 0.12:
+    if prob >= 0.65 and value >= 0.12:
         return "🔥 PREMIUM"
-    elif prob >= 0.58 and value >= 0.10:
+    elif prob >= 0.60 and value >= 0.08:
         return "✅ BOA"
-    return None
-
-# =========================
-# IA SIMPLES
-# =========================
-def prever_probabilidade():
-    import random
-    return round(random.uniform(0.56, 0.66), 2)
+    return "📊 PADRÃO"
 
 # =========================
 # LOOP PRINCIPAL
 # =========================
 def run():
-    print("🚀 Sistema iniciado...")
+    print("🚀 Sistema profissional iniciado...")
 
     enviados = set()
 
@@ -56,15 +94,19 @@ def run():
         jogos = get_games()
         print(f"📊 Jogos encontrados: {len(jogos)}")
 
-        # 🔥 Sem jogos → tenta depois
         if not jogos:
-            print("⚠️ Nenhum jogo disponível. Tentando novamente em 30 min...\n")
+            print("⚠️ Sem jogos... tentando novamente em 30 min\n")
             time.sleep(1800)
             continue
 
         apostas = []
 
         for jogo in jogos:
+
+            # 🔥 filtro de tempo
+            if not jogo_valido(jogo["date"]):
+                continue
+
             home = jogo["home"]
             away = jogo["away"]
             league = jogo["league"]
@@ -81,11 +123,16 @@ def run():
             ]
 
             for nome, odd in mercados:
-                prob = prever_probabilidade()
-                value = calcular_value(prob, odd)
 
-                # 🔥 FILTRO PRINCIPAL
-                if prob < MIN_PROB or value < MIN_VALUE:
+                prob = calcular_probabilidade_real(odd, league)
+                value = calcular_value(prob, odd)
+                score = calcular_score(prob, value)
+
+                # 🔥 filtro profissional
+                if prob < 0.57:
+                    continue
+
+                if value < 0.05:
                     continue
 
                 tipo = classificar_aposta(prob, value)
@@ -100,23 +147,23 @@ def run():
                     "prob": prob,
                     "odd": odd,
                     "value": value,
+                    "score": score,
                     "tipo": tipo
                 })
 
-        # 🔥 ORDENA MELHORES
-        apostas = sorted(apostas, key=lambda x: x["value"], reverse=True)
+        # 🔥 ordena por score (IA)
+        apostas = sorted(apostas, key=lambda x: x["score"], reverse=True)
 
-        # 🔥 LIMITA TOP
+        # 🔥 limita entre 15 e 20
         apostas = apostas[:TOP_MAX]
-
-        # 🔥 GARANTE ENVIO (mesmo com poucos jogos)
-        if len(apostas) < TOP_MIN:
-            print("⚠️ Poucas apostas boas, enviando mesmo assim...\n")
 
         if not apostas:
             print("⚠️ Nenhuma aposta encontrada\n")
             time.sleep(1800)
             continue
+
+        if len(apostas) < TOP_MIN:
+            print("⚠️ Poucas apostas, enviando mesmo assim...\n")
 
         print(f"🔥 Enviando {len(apostas)} apostas...\n")
 
@@ -132,13 +179,12 @@ def run():
 📊 {aposta['mercado']}
 📈 Prob: {int(aposta['prob']*100)}%
 💰 Odd: {aposta['odd']}
-📊 Value: {round(aposta['value'],3)}
+📊 Value: {aposta['value']}
 """
 
             enviar_telegram(msg)
             enviados.add(aposta["id"])
-
-            time.sleep(2)  # evita flood
+            time.sleep(2)
 
         print("⏳ Aguardando 1 hora...\n")
         time.sleep(3600)
